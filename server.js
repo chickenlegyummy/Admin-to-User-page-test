@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -9,7 +10,7 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*', // Allow all origins for development
+    origin: '*',
     methods: ['GET', 'POST']
   }
 });
@@ -18,8 +19,11 @@ io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
   socket.on('play-video', () => {
-    // Broadcast to all clients except sender
-    socket.broadcast.emit('play-video');
+    io.emit('play-video'); // Broadcast to all clients
+  });
+
+  socket.on('video-ended', () => {
+    io.emit('video-ended'); // Broadcast to all clients
   });
 
   socket.on('disconnect', () => {

@@ -12,6 +12,23 @@ function UserPage() {
         videoRef.current.play();
       }
     });
+
+    // Add event listener for video ended
+    const videoElement = videoRef.current;
+    if (videoElement) {
+      const handleEnded = () => {
+        socket.emit('video-ended');
+      };
+      videoElement.addEventListener('ended', handleEnded);
+
+      // Cleanup
+      return () => {
+        videoElement.removeEventListener('ended', handleEnded);
+        socket.disconnect();
+      };
+    }
+
+    // Cleanup socket if video element is not present
     return () => {
       socket.disconnect();
     };
