@@ -1,5 +1,4 @@
 // src/layouts/UserLayout.js
-import React from 'react';
 
 function UserLayout({ children }) {
   return (

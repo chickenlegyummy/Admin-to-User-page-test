@@ -22,9 +22,8 @@ function UserPage() {
       Hello User!
       <video
         id="videoPlayer"
-        style={{ width: "300px" }}
+        style={{ width: "800px" }}
         src="42.mp4"
-        muted
         ref={videoRef}
       ></video>
     </div>
