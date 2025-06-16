@@ -26,6 +26,14 @@ io.on('connection', (socket) => {
     io.emit('video-ended'); // Broadcast to all clients
   });
 
+  socket.on('next-video', () => {
+    io.emit('next-video'); // Broadcast to all clients
+  });
+
+  socket.on('video-playing', (data) => {
+    io.emit('video-playing', data); // Broadcast to all clients
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });

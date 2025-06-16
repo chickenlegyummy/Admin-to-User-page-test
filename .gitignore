@@ -23,3 +23,5 @@ yarn-debug.log*
 yarn-error.log*
 
 public/42.mp4
+
+.env

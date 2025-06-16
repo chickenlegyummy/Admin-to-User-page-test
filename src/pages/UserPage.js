@@ -1,16 +1,28 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
+import { videoList, videoIndex, setVideoIndex } from '../utils'; 
 
 let socket;
 function UserPage() {
   const videoRef = useRef(null);
+  const [video, setVideo] = useState(videoList[0]);
 
   useEffect(() => {
-    socket = io('http://localhost:3001');
+    socket = io(process.env.REACT_APP_SERVER_IP);
     socket.on('play-video', () => {
       if (videoRef.current) {
         videoRef.current.play();
       }
+    });
+    socket.on('next-video', () => {
+      if(videoIndex < videoList.length - 1) {
+        setVideoIndex(videoIndex + 1);
+        setVideo(videoList[videoIndex]);
+      } else {
+        setVideoIndex(0);
+        setVideo(videoList[videoIndex]);
+      }
+      socket.emit('video-playing', videoIndex);
     });
 
     // Add event listener for video ended
@@ -40,7 +52,7 @@ function UserPage() {
       <video
         id="videoPlayer"
         style={{ width: "800px" }}
-        src="42.mp4"
+        src={video}
         ref={videoRef}
       ></video>
     </div>
