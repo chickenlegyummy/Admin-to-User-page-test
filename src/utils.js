@@ -14,3 +14,7 @@ export const setVideoIndex = (index) => {
     console.error("Index out of bounds");
   }
 }
+
+export const getVideoIndex = () => {
+  return videoIndex;
+}

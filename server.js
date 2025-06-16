@@ -1,45 +1,91 @@
 // server.js
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
 const cors = require('cors');
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+// Store application state
+let appState = {
+  status: 'Idle',
+  currentVideoIndex: 0,
+  command: null
+};
+
+// Store SSE connections
+let connections = [];
+
+// SSE endpoint for real-time updates
+app.get('/events', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  });
+
+  connections.push(res);
+
+  // Send current state immediately
+  res.write(`data: ${JSON.stringify(appState)}\n\n`);
+
+  // Handle client disconnect
+  req.on('close', () => {
+    connections = connections.filter(conn => conn !== res);
+  });
 });
 
-io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
-
-  socket.on('play-video', () => {
-    io.emit('play-video'); // Broadcast to all clients
+// Broadcast to all connected clients
+const broadcast = (data) => {
+  connections.forEach(conn => {
+    try {
+      conn.write(`data: ${JSON.stringify(data)}\n\n`);
+    } catch (err) {
+      // Remove dead connections
+      connections = connections.filter(c => c !== conn);
+    }
   });
+};
 
-  socket.on('video-ended', () => {
-    io.emit('video-ended'); // Broadcast to all clients
-  });
+// Admin endpoints
+app.post('/admin/play-video', (req, res) => {
+  appState.command = 'play-video';
+  appState.status = 'Playing';
+  broadcast(appState);
+  res.json({ success: true });
+});
 
-  socket.on('next-video', () => {
-    io.emit('next-video'); // Broadcast to all clients
-  });
+app.post('/admin/next-video', (req, res) => {
+  appState.command = 'next-video';
+  appState.status = 'Idle';
+  broadcast(appState);
+  res.json({ success: true });
+});
 
-  socket.on('video-playing', (data) => {
-    io.emit('video-playing', data); // Broadcast to all clients
-  });
+// User endpoints
+app.post('/user/video-ended', (req, res) => {
+  appState.status = 'Video has ended';
+  appState.command = 'video-ended';
+  broadcast(appState);
+  res.json({ success: true });
+});
 
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
+app.post('/user/video-playing', (req, res) => {
+  const { videoIndex } = req.body;
+  appState.currentVideoIndex = videoIndex;
+  appState.command = 'video-playing';
+  broadcast(appState);
+  res.json({ success: true });
+});
+
+// Get current state
+app.get('/state', (req, res) => {
+  res.json(appState);
 });
 
 const PORT = 3001;
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });

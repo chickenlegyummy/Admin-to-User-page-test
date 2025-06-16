@@ -8,13 +8,6 @@ function App() {
   const [role, setRole] = useState(null);
   const videoRef = useRef(null);
 
-  // Function to trigger video playback
-  const handlePlayVideo = () => {
-    if (videoRef.current) {
-      videoRef.current.play();
-    }
-  };
-
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
@@ -29,7 +22,7 @@ function App() {
       )}
       {role === 'admin' && (
         <AdminLayout>
-          <AdminPage onPlayVideo={handlePlayVideo} />
+          <AdminPage />
         </AdminLayout>
       )}
     </div>
