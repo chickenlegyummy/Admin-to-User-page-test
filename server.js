@@ -1,10 +1,16 @@
 // server.js
 const express = require('express');
-const cors = require('cors');
+const { createServer } = require('http');
+const { WebSocketServer } = require('ws');
 
 const app = express();
-app.use(cors());
 app.use(express.json());
+
+// Create HTTP server
+const server = createServer(app);
+
+// Create WebSocket server
+const wss = new WebSocketServer({ server });
 
 // Store application state
 let appState = {
@@ -13,79 +19,87 @@ let appState = {
   command: null
 };
 
-// Store SSE connections
-let connections = [];
+// Store WebSocket connections
+let connections = new Set();
 
-// SSE endpoint for real-time updates
-app.get('/events', (req, res) => {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Cache-Control'
+// WebSocket connection handling
+wss.on('connection', (ws) => {
+  console.log('Client connected');
+  connections.add(ws);
+
+  // Send current state immediately to new connection
+  ws.send(JSON.stringify(appState));
+
+  // Handle messages from clients
+  ws.on('message', (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      
+      switch (message.type) {
+        case 'admin-play-video':
+          appState.command = 'play-video';
+          appState.status = 'Playing';
+          broadcast(appState);
+          break;
+          
+        case 'admin-next-video':
+          appState.command = 'next-video';
+          appState.status = 'Idle';
+          broadcast(appState);
+          break;
+          
+        case 'user-video-ended':
+          appState.status = 'Video has ended';
+          appState.command = 'video-ended';
+          broadcast(appState);
+          break;
+          
+        case 'user-video-playing':
+          appState.currentVideoIndex = message.videoIndex;
+          appState.command = 'video-playing';
+          broadcast(appState);
+          break;
+      }
+    } catch (error) {
+      console.error('Error parsing message:', error);
+    }
   });
 
-  connections.push(res);
-
-  // Send current state immediately
-  res.write(`data: ${JSON.stringify(appState)}\n\n`);
-
   // Handle client disconnect
-  req.on('close', () => {
-    connections = connections.filter(conn => conn !== res);
+  ws.on('close', () => {
+    console.log('Client disconnected');
+    connections.delete(ws);
+  });
+
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+    connections.delete(ws);
   });
 });
 
 // Broadcast to all connected clients
 const broadcast = (data) => {
-  connections.forEach(conn => {
-    try {
-      conn.write(`data: ${JSON.stringify(data)}\n\n`);
-    } catch (err) {
-      // Remove dead connections
-      connections = connections.filter(c => c !== conn);
+  connections.forEach(ws => {
+    if (ws.readyState === ws.OPEN) {
+      try {
+        ws.send(JSON.stringify(data));
+      } catch (err) {
+        console.error('Error broadcasting to client:', err);
+        connections.delete(ws);
+      }
+    } else {
+      connections.delete(ws);
     }
   });
 };
 
-// Admin endpoints
-app.post('/admin/play-video', (req, res) => {
-  appState.command = 'play-video';
-  appState.status = 'Playing';
-  broadcast(appState);
-  res.json({ success: true });
-});
-
-app.post('/admin/next-video', (req, res) => {
-  appState.command = 'next-video';
-  appState.status = 'Idle';
-  broadcast(appState);
-  res.json({ success: true });
-});
-
-// User endpoints
-app.post('/user/video-ended', (req, res) => {
-  appState.status = 'Video has ended';
-  appState.command = 'video-ended';
-  broadcast(appState);
-  res.json({ success: true });
-});
-
-app.post('/user/video-playing', (req, res) => {
-  const { videoIndex } = req.body;
-  appState.currentVideoIndex = videoIndex;
-  appState.command = 'video-playing';
-  broadcast(appState);
-  res.json({ success: true });
-});
-
-// Get current state
+// Keep the HTTP endpoints for backwards compatibility (optional)
 app.get('/state', (req, res) => {
   res.json(appState);
 });
 
 const PORT = 3001;
-app.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server listening on port ${PORT}`);
+  console.log(`WebSocket server running on ws://0.0.0.0:${PORT}`);
 });
